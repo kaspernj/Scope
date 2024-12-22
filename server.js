@@ -1,12 +1,12 @@
 const WebSocket = require("ws");
 const express = require("express");
 const fs = require("fs");
-var https = require("https");
+const http = require("http");
+const https = require("https");
 const stripJsonComments = require("strip-json-comments");
 const { Console } = require("console");
 var colors = require('colors');
 const app = express();
-const port = 80;
 
 console.clear();
 
@@ -18,7 +18,7 @@ function loadConf() {
   // load game config
   fs.readFile('config/game/default.json', function (err, data) {
     if (err) {
-      throw err; 
+      throw err;
     }
     gameSettings = JSON.parse(stripJsonComments(data.toString()));
   });
@@ -32,7 +32,7 @@ function loadConf() {
       console.log(colors.yellow("Found weapon config", file));
       fs.readFile('config/weapon/' + file, function (err, data) {
         if (err) {
-          throw err; 
+          throw err;
         }
         weaponDefinitions.push(JSON.parse(stripJsonComments(data.toString())));
       });
@@ -55,18 +55,51 @@ console.log(("Game id: " + game.id).green);
 app.use("/", express.static("static/appdev"));
 app.use(express.static("static"));
 
-const httpsServer = https.createServer(
-  {
-    key: fs.readFileSync("certs/server.key"),
-    cert: fs.readFileSync("certs/server.cert"),
-  },
-  app
-);
+const arguments = process.argv
+let argumentIndex = 0
+let host = "localhost"
+let httpMode = "https"
+let port = 80
 
-const wss = new WebSocket.Server({ server: httpsServer });
+while (argumentIndex < arguments.length) {
+  argument = arguments[argumentIndex]
 
-httpsServer.listen(3000, () => {
-  console.log("Listening at https://localhost/".yellow);
+  let match
+
+  if (match = argument.match(/^--host=(.+)$/)) {
+    host = match[1]
+  } else if (argument == "--http") {
+    httpMode = "http"
+  } else if (match = argument.match(/^--port=(\d+)$/)) {
+    port = parseInt(match[1])
+  }
+
+  argumentIndex++
+}
+
+let httpServer
+
+console.log({httpMode, host, port})
+
+if (httpMode == "https") {
+  httpServer = https.createServer(
+    {
+      key: fs.readFileSync("certs/server.key"),
+      cert: fs.readFileSync("certs/server.cert"),
+    },
+    app
+  );
+} else {
+  httpServer = http.createServer(
+    {},
+    app
+  );
+}
+
+const wss = new WebSocket.Server({ server: httpServer });
+
+httpServer.listen(port, host, () => {
+  console.log(`Listening at https://${host}:${port}/`.yellow);
 });
 
 wss.on("connection", (ws) => {
@@ -104,7 +137,7 @@ wss.on("connection", (ws) => {
 });
 
 function sendToSID(id, message) {
-  let client = wss.clients.forEach((client) => {
+  wss.clients.forEach((client) => {
     if (client.id == id) {
       client.send(message);
     }

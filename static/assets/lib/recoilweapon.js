@@ -51,54 +51,61 @@
       this.buttons = {};
     }
 
-    connect() {
+    connect = async () => await this.runWithQueue(this._connect)
+
+    runWithQueue(callback) {
       return new Promise(async (resolve, reject) => {
-        this._queue(() => this._connect().then(()=>resolve()).catch(()=>reject()));
+        this._queue(async () => {
+          try {
+            const result = await callback()
+            resolve(result)
+          } catch (error) {
+            reject(error)
+          }
+        });
       });
     }
 
-    _connect() {
-      return new Promise(async (resolve, reject) => {
-        let device, server, service;
-        let controlCharacteristic,
-          configCharacteristic,
-          telemetryCharacteristic;
-        let filters = [{ namePrefix: "SRG" }];
-        let options = {};
-        options.filters = filters;
-        options.optionalServices = [recoilServiceAddress];
+    _connect = async () => {
+      let device, server, service;
+      let controlCharacteristic,
+        configCharacteristic,
+        telemetryCharacteristic;
 
-        try {
-          /* Request device */
-          device = await navigator.bluetooth.requestDevice(options);
+      let options = {
+        filters: [{ namePrefix: "SRG" }],
+        optionalServices: [recoilServiceAddress]
+      }
 
-          /* Connect to GATT */
-          console.log("Connecting to GATT Server...");
-          device.addEventListener(
-            "gattserverdisconnected",
-            this._disconnect.bind(this)
-          );
-          server = await device.gatt.connect();
+      /* Request device */
+      if (!navigator.bluetooth) {
+        throw new Error("Bluetooth not present - maybe not secure browsing context or maybe Web Bluetooth API not enabled in brave://flags")
+      }
 
-          /* Fetch characteristics */
-          service = await server.getPrimaryService(recoilServiceAddress);
-          controlCharacteristic = await service.getCharacteristic(
-            controlAddress
-          );
-          configCharacteristic = await service.getCharacteristic(configAddress);
-          telemetryCharacteristic = await service.getCharacteristic(
-            telemetryAddress
-          );
+      device = await navigator.bluetooth.requestDevice(options);
 
-          this._CONFIGCHAR = configCharacteristic;
-          this._CONTROLCHAR = controlCharacteristic;
-          this._TELEMETRYCHAR = telemetryCharacteristic;
-          this.isConnected = true;
-          resolve();
-        } catch (e) {
-          reject(e);
-        }
-      });
+      /* Connect to GATT */
+      console.log("Connecting to GATT Server...");
+      device.addEventListener(
+        "gattserverdisconnected",
+        this._disconnect.bind(this)
+      );
+      server = await device.gatt.connect();
+
+      /* Fetch characteristics */
+      service = await server.getPrimaryService(recoilServiceAddress);
+      controlCharacteristic = await service.getCharacteristic(
+        controlAddress
+      );
+      configCharacteristic = await service.getCharacteristic(configAddress);
+      telemetryCharacteristic = await service.getCharacteristic(
+        telemetryAddress
+      );
+
+      this._CONFIGCHAR = configCharacteristic;
+      this._CONTROLCHAR = controlCharacteristic;
+      this._TELEMETRYCHAR = telemetryCharacteristic;
+      this.isConnected = true;
     }
 
     startTelemetry() {
@@ -398,20 +405,20 @@
 
     _queue(f) {
 			var that = this;
-			
+
 			function run() {
 				if (!that._QUEUE.length) {
-					that._WORKING = false; 
+					that._WORKING = false;
 					return;
 				}
-				
+
 				that._WORKING = true;
 				(that._QUEUE.shift()()).then(() => run());
 			}
-			
+
 			that._QUEUE.push(f);
-			
-			if (!that._WORKING) run();	
+
+			if (!that._WORKING) run();
 		}
   }
 
