@@ -31,9 +31,11 @@ var weaponDefinitions = [
 
 
 readyBtn.addEventListener("click", ready);
-document.getElementById("connectGunbtn").addEventListener("click", ()=>{
+document.getElementById("connectGunbtn").addEventListener("click", async () => {
   console.log("Connecting to gun.");
-  RecoilGun.connect().then(() => {
+
+  try {
+    await RecoilGun.connect()
     bleSuccess();
     RecoilGun.gunSettings.shotId = 2;
     RecoilGun.gunSettings.recoil = false;
@@ -42,10 +44,15 @@ document.getElementById("connectGunbtn").addEventListener("click", ()=>{
     RecoilGun.on("reloadBtn", reload);
     RecoilGun.switchWeapon(2);
     RecoilGun.startTelemetry();
-  }).catch((error)=>{
-    console.log("Failure to connect", error);
+  } catch (error) {
+    const errorMsg = `Failed to connect: ${error.message}`
+
+    console.log(errorMsg);
+    alert(errorMsg)
     bleFailure();
-  });
+
+    throw error
+  }
 });
 
 //Lobby stuff

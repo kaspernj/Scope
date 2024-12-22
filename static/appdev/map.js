@@ -13,8 +13,29 @@ window.onload = () => {
 //   canvas.height = mapParent.clientHeight;
 // };
 
-var sensor = new AbsoluteOrientationSensor();
-sensor.addEventListener("reading", (e) => handleSensor(e));
+let sensor
+
+Promise.all([
+  navigator.permissions.query({ name: "accelerometer" }),
+  navigator.permissions.query({ name: "magnetometer" }),
+  navigator.permissions.query({ name: "gyroscope" }),
+]).then((results) => {
+  if (results.every((result) => result.state === "granted")) {
+    startSensor()
+    // …
+  } else {
+    alert(
+      "No permissions to use AbsoluteOrientationSensor" +
+      " - might have to be enabled in (for Brave) Settings -> Privacy and security -> Additional permissions -> Motion sensors."
+    );
+  }
+});
+
+function startSensor() {
+  sensor = new AbsoluteOrientationSensor();
+  sensor.addEventListener("reading", (e) => handleSensor(e));
+  sensor.start();
+}
 
 var rotation = 0;
 var scale = 300;
